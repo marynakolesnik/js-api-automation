@@ -1,39 +1,25 @@
-import { expect } from "chai";
-import { Request } from "../helper/request";
-import { Steps } from "../helper/steps";
+import * as chai from "chai";
+chai.use(require("chai-json-schema-ajv"));
+const expect = chai.expect;
+
+import UserController from "./../controllers/userController";
+import schema from "../json-schemas";
 
 
 describe("User", function () {
     it("should get user information", async function () {
-        const api = await new Steps().loginAsAdmin();
-        const userCreateResp = await api.createUser();
-        const token = await api.getToken();
+        const userCreateResp = await new UserController().createRandomUser();
+        const userInfoResp = await new UserController().getUser(userCreateResp);
 
-        const userInfoResp = await new Request(
-            "http://ip-5236.sunline.net.ua:30020/api/users/" + userCreateResp.body["_id"])
-            .method("GET")
-            .auth(token)
-            .send();
-
-        expect(userInfoResp.statusCode).to.equal(200, userInfoResp.statusCode);
-        expect(userInfoResp.body, JSON.stringify(userInfoResp.body))
-            .to.be.an("object");
-        expect(userInfoResp.body.username).to.be.equal(api.getCreatedUser().username);
+        expect(userInfoResp, JSON.stringify(userInfoResp)).to.be.jsonSchema(schema.user.userInformation);
+        expect(userInfoResp._id).to.be.equal(userCreateResp._id);
     });
 
     it("should NOT get user information without token", async function () {
-        const api = await new Steps().loginAsAdmin();
-        const userCreateResp = await api.createUser();
+        const userCreateResp = await new UserController().createRandomUser();
+        const userInfoResp = await new UserController().getUser(userCreateResp, "wrong token");
 
-        const userInfoResp = await new Request(
-            "http://ip-5236.sunline.net.ua:30020/api/users/" + userCreateResp.body["_id"])
-            .method("GET")
-            .send();
-
-        expect(userInfoResp.statusCode).to.equal(200, userInfoResp.statusCode);
-        expect(userInfoResp.body.statusCode).to.equal(401, userInfoResp.body);
-        expect(userInfoResp.body, JSON.stringify(userInfoResp.body))
-            .to.be.an("object")
-            .that.contains.keys(["error", "message"]);
+        expect(userInfoResp.statusCode).to.equal(401);
+        expect(userInfoResp, JSON.stringify(userInfoResp)).to.be.jsonSchema(schema.auth.unauthorized);
     });
 });

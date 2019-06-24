@@ -1,69 +1,36 @@
-import { Request } from "../helper/request";
-import { Steps } from "../helper/steps";
-import { expect } from "chai";
+import * as chai from "chai";
+chai.use(require("chai-json-schema-ajv"));
+const expect = chai.expect;
 
+import UserController from "./../controllers/userController";
+import schema from "../json-schemas";
 
 describe("User", function () {
     it("deleting user should be successful", async function () {
-        const api = await new Steps().loginAsAdmin();
-        const token = await api.getToken();
-        const userCreateResp = await api.createUser();
+        const userCreateResp = await new UserController().createRandomUser();
+        const userDeleteResp = await new UserController().deleteUser(userCreateResp);
 
-        const userDeleteResp = await new Request(
-            "http://ip-5236.sunline.net.ua:30020/api/users/" + userCreateResp.body["_id"]
-        )
-            .method("DELETE")
-            .auth(token)
-            .send();
+        expect(userDeleteResp, JSON.stringify(userDeleteResp)).to.be.jsonSchema(schema.user.deleteUserSuccess);
 
-        expect(userDeleteResp.statusCode).to.equal(200, userDeleteResp.statusCode);
-        expect(userDeleteResp.body, JSON.stringify(userDeleteResp.body))
-            .to.be.an("object")
-            .that.has.key("_id");
-        expect(userDeleteResp.body["_id"]).to.equal(userCreateResp.body["_id"]);
-        expect(typeof userDeleteResp.body["_id"], userDeleteResp.body).to.equal(
-            "string"
-        );
         // check if user exists
-        const userInfoResp = await new Request(
-            "http://ip-5236.sunline.net.ua:30020/api/users/" + userCreateResp.body["_id"])
-            .method("GET")
-            .auth(token)
-            .send();
-
-        expect(userInfoResp.statusCode).to.equal(200, userInfoResp.statusCode);
-        expect(userInfoResp.body, JSON.stringify(userInfoResp.body))
+        const userInfoResp = await new UserController().getUser(userCreateResp);
+        expect(userInfoResp, JSON.stringify(userInfoResp))
             .to.be.undefined;
     });
 
     it("should NOT delete user without token", async function () {
-        const api = await new Steps().loginAsAdmin();
-        const token = await api.getToken();
-        const userCreateResp = await api.createUser();
+        const userCreateResp = await new UserController().createRandomUser();
+        const userDeleteResp = await new UserController().deleteUser(userCreateResp, "wrong token");
 
-        const userDeleteResp = await new Request(
-            "http://ip-5236.sunline.net.ua:30020/api/users/" + userCreateResp.body["_id"]
-        )
-            .method("DELETE")
-            .send();
-
-        expect(userDeleteResp.statusCode).to.equal(200, userDeleteResp.statusCode);
-        expect(userDeleteResp.body.statusCode).to.equal(401, userDeleteResp.body);
-        expect(userDeleteResp.body, JSON.stringify(userDeleteResp.body))
-            .to.be.an("object");
+        expect(userDeleteResp.statusCode).to.equal(401);
+        expect(userDeleteResp, JSON.stringify(userDeleteResp)).to.be.jsonSchema(schema.auth.unauthorized);
 
         // check if user exists
-        const userInfoResp = await new Request(
-            "http://ip-5236.sunline.net.ua:30020/api/users/" + userCreateResp.body["_id"])
-            .method("GET")
-            .auth(token)
-            .send();
-
-        expect(userInfoResp.statusCode).to.equal(200, userInfoResp.statusCode);
-        expect(userInfoResp.body, JSON.stringify(userInfoResp.body))
+        const userInfoResp = await new UserController().getUser(userCreateResp);
+        expect(userInfoResp, JSON.stringify(userInfoResp))
             .to.be.an("object")
             .that.contains.keys(["_id", "username"]);
-        expect(userInfoResp.body.username).to.be.equal(api.getCreatedUser().username);
+        expect(userInfoResp._id).to.be.equal(userCreateResp._id);
     });
 
 });
